@@ -15,7 +15,10 @@
   <main>
     <section id="viewDashboard" class="view" role="tabpanel" aria-labelledby="tab-dashboard">
       <div class="page-head">
-        <h2 class="page-title">Dashboard</h2>
+        <div class="title-group">
+          <h2 class="page-title">Dashboard</h2>
+          <p class="period" id="periodLabel"></p>
+        </div>
         <div class="controls">
           <div class="segmented" role="group" aria-label="Layout">
             <button type="button" id="layoutBlocks" aria-pressed="true">Blocks</button>
@@ -28,7 +31,6 @@
           <label><span class="visually-label">Year</span><select class="year-select" id="yearSelect"></select></label>
         </div>
       </div>
-      <p class="period" id="periodLabel"></p>
       <div class="tiles" id="tiles"></div>
       <div class="scroll" id="monthWrap" hidden><table class="lanes" id="monthTable"></table></div>
       <div class="scroll" id="weekWrap" hidden><table class="lanes weeks" id="weekTable"></table></div>

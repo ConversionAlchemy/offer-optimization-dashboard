@@ -35,28 +35,7 @@ const LANES = [
 ];
 const LANE = Object.fromEntries(LANES.map(l => [l.k, l]));
 
-const TILES = [
-  { k: "cp", wide: true,
-    limit: m => "Before ads: " + fmt(m.before, "money0"),
-    status: m => m.cp >= 0 ? "Making money after ads" : "Losing money after ads" },
-  { k: "cm", wide: true,
-    limit: m => "Before ads: " + fmt(m.cmb, "pct1"),
-    status: m => m.cm >= 0 ? "Positive after ads" : "Negative after ads" },
-  { k: "cac",
-    limit: m => "Break-even: " + fmt(m.becac, "money2"),
-    status: m => m.cac <= m.becac ? "Inside your limit" : "Over your limit" },
-  { k: "roas",
-    limit: m => "Break-even: " + fmt(m.beroas, "x"),
-    status: m => m.roas >= m.beroas ? "Above break-even" : "Below break-even" },
-  { k: "beroas",
-    limit: m => "Your ROAS: " + fmt(m.roas, "x"),
-    status: m => m.roas >= m.beroas ? "Your ads clear it" : "Your ads fall short" },
-  { k: "ltv",
-    limit: m => "Your CAC: " + fmt(m.cac, "money2"),
-    status: m => m.ltv >= m.cac ? "Covers your CAC" : "Doesn't cover your CAC" },
-  { k: "cvr", wide: true },
-  { k: "aov", wide: true }
-];
+const TILES = ["cp", "cm", "cac", "roas", "beroas", "ltv", "cvr", "aov"].map(k => ({ k }));
 
 const AI_PROMPT = `I'm filling in my Offer Optimization Dashboard. Using the Shopify and ad platform reports I give you, work out my numbers week by week and reply with JSON only: no explanation, no code fences, no extra keys.
 
@@ -351,11 +330,10 @@ function renderDashboard(d) {
   tiles.replaceChildren();
   TILES.forEach(t => {
     const lane = LANE[t.k];
-    const tile = el("article", "tile m-" + t.k + (t.wide ? " wide" : ""));
+    const tile = el("article", "tile m-" + t.k);
     tile.append(el("h2", "tile-head", lane.label));
     const body = el("div", "tile-body");
     body.append(el("p", "tile-value", fmt(m[t.k], lane.fmt)));
-    if (t.limit) body.append(el("p", "tile-limit", t.limit(m)));
     const ch = prev ? change(m[t.k], prev[t.k], lane.fmt, unit) : "";
     body.append(el("p", "tile-change", ch || " "));
     body.append(barChart(series, t.k, labels, idx, pick));
@@ -499,6 +477,7 @@ $("#inputTable").addEventListener("input", e => {
 
 function render() {
   document.body.classList.toggle("on-inputs", view === "inputs");
+  document.body.classList.toggle("on-dash", view === "dashboard");
   document.querySelectorAll(".tab-list button").forEach(b => b.setAttribute("aria-selected", b.dataset.view === view));
   $("#viewDashboard").hidden = view !== "dashboard";
   $("#viewInputs").hidden = view !== "inputs";
