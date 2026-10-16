@@ -193,14 +193,10 @@ function fmt(v, type) {
   return neg ? "(" + out + ")" : out;
 }
 
+// Every change is shown the same way: as a % of last period's number.
 function change(cur, prev, type, unit) {
   if (!Number.isFinite(cur) || !Number.isFinite(prev)) return "";
-  const tail = " vs last " + unit;
-  if (type === "pct1" || type === "pct2") {
-    const pts = (cur - prev) * 100;
-    if (Math.abs(pts) < 0.05) return "No change" + tail;
-    return (pts > 0 ? "▲ " : "▼ ") + Math.abs(pts).toFixed(1) + " pts" + tail;
-  }
+  const tail = " vs " + unit;
   if (!prev) return "";
   const rel = (cur - prev) / Math.abs(prev);
   if (Math.abs(rel) < 0.005) return "No change" + tail;
@@ -300,6 +296,13 @@ document.addEventListener("focusin", e => { if (e.target.classList && e.target.c
 document.addEventListener("focusout", hideTip);
 addEventListener("scroll", hideTip, true);
 
+// The week keys that belong to one month of a year.
+function monthKeys(y, mIdx) {
+  const keys = [];
+  for (let n = 1; n <= weeksIn(y); n++) { const t = weekStart(y, n); if (monthOfWeek(t) === mIdx) keys.push(isoKey(t)); }
+  return keys;
+}
+
 // The period before the first week or month of the year comes from the year before.
 function previousYearTail() {
   if (dashMode === "week") return aggregate([isoKey(week1Monday(year) - 7 * DAY)]);
@@ -361,7 +364,20 @@ function renderDashboard(d) {
   $("#ghostKey").textContent = "Dotted bars show " + (year - 1);
 
   const m = series[idx];
-  const prev = idx > 0 ? series[idx - 1] : previousYearTail();
+  let prev = idx > 0 ? series[idx - 1] : previousYearTail();
+  let compareTo = "last " + unit;
+  // A month that's only partly filled in is compared with the same number of weeks from the month before,
+  // so one week of October isn't judged against all of September.
+  if (dashMode === "month") {
+    const inMonth = monthKeys(year, idx);
+    const filled = inMonth.filter(k => hasData(state.weeks[k])).length;
+    if (filled && filled < inMonth.length) {
+      const before = idx > 0 ? monthKeys(year, idx - 1) : monthKeys(year - 1, 11);
+      prev = aggregate(before.slice(0, filled));
+      compareTo = "the same " + (filled === 1 ? "week" : filled + " weeks") + " last month";
+      $("#periodLabel").textContent = period + " \u00b7 " + filled + " of " + inMonth.length + " weeks";
+    }
+  }
   const pick = i => { selected[dashMode] = i; hideTip(); renderDashboard(d); };
 
   const tiles = $("#tiles");
@@ -372,7 +388,7 @@ function renderDashboard(d) {
     tile.append(el("h2", "tile-head", lane.label));
     const body = el("div", "tile-body");
     body.append(el("p", "tile-value", fmt(m[t.k], lane.fmt)));
-    const ch = prev ? change(m[t.k], prev[t.k], lane.fmt, unit) : "";
+    const ch = prev ? change(m[t.k], prev[t.k], lane.fmt, compareTo) : "";
     body.append(el("p", "tile-change", ch || " "));
     body.append(barChart(series, t.k, labels, idx, pick, ghostSeries));
     tile.append(body);
