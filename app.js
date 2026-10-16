@@ -166,9 +166,9 @@ function metrics(s) {
   };
 }
 
-function yearData() {
-  const n = weeksIn(year);
-  const weekKeys = Array.from({ length: n }, (_, i) => isoKey(weekStart(year, i + 1)));
+function yearData(y = year) {
+  const n = weeksIn(y);
+  const weekKeys = Array.from({ length: n }, (_, i) => isoKey(weekStart(y, i + 1)));
   const byMonth = MONTHS.map(() => []);
   weekKeys.forEach(k => byMonth[monthOfWeek(keyTime(k))].push(k));
   return {
@@ -232,34 +232,43 @@ function latestIndex(series) {
   return -1;
 }
 
-function barChart(series, key, labels, idx, onPick) {
+function barChart(series, key, labels, idx, onPick, ghostSeries) {
+  const lane = LANE[key];
   const vals = series.map(m => (m ? m[key] : NaN));
-  const finite = vals.filter(Number.isFinite);
+  const ghosts = vals.map((_, i) => (ghostSeries && ghostSeries[i] ? ghostSeries[i][key] : NaN));
+  const finite = vals.concat(ghosts).filter(Number.isFinite);
   const min = Math.min(0, ...finite), max = Math.max(0, ...finite);
   const range = max - min || 1;
+  const place = (node, v) => {
+    node.style.setProperty("--b", ((Math.min(v, 0) - min) / range * 100) + "%");
+    node.style.setProperty("--h", Math.max(Math.abs(v) / range * 100, 0.8) + "%");
+  };
   const wrap = el("div", "chart");
   const bars = el("div", "bars");
   vals.forEach((v, i) => {
     const b = el("button", "bar" + (i === idx ? " selected" : ""));
     b.type = "button";
+    const g = ghosts[i];
+    if (Number.isFinite(g)) { const gs = el("i", "ghost"); place(gs, g); b.append(gs); }
     const span = el("span");
+    const lines = [labels.full[i], Number.isFinite(v) ? fmt(v, lane.fmt) : "No data"];
+    if (Number.isFinite(g)) lines.push(labels.ghost + ": " + fmt(g, lane.fmt));
+    b.dataset.tip = lines.join("\n");
+    b.setAttribute("aria-label", lines.join(", "));
     if (Number.isFinite(v)) {
-      span.style.setProperty("--b", ((Math.min(v, 0) - min) / range * 100) + "%");
-      span.style.setProperty("--h", Math.max(Math.abs(v) / range * 100, 0.8) + "%");
-      b.setAttribute("aria-label", labels.full[i] + ": " + fmt(v, LANE[key].fmt));
-      b.title = labels.full[i] + ": " + fmt(v, LANE[key].fmt);
+      place(span, v);
       b.addEventListener("click", () => onPick(i));
     } else {
-      b.disabled = true;
-      b.setAttribute("aria-label", labels.full[i] + ": no data");
+      b.classList.add("no-data");
+      b.setAttribute("aria-disabled", "true");
     }
     b.append(span);
     bars.append(b);
   });
   if (min < 0) {
-    const z = el("div", "zero");
-    z.style.bottom = ((0 - min) / range * 100) + "%";
-    bars.append(z);
+    const zr = el("div", "zero");
+    zr.style.bottom = ((0 - min) / range * 100) + "%";
+    bars.append(zr);
   }
   const axis = el("div", "axis");
   axis.setAttribute("aria-hidden", "true");
@@ -267,6 +276,29 @@ function barChart(series, key, labels, idx, onPick) {
   wrap.append(bars, axis);
   return wrap;
 }
+
+/* instant hover readout for the bars */
+const tip = el("div", "chart-tip");
+tip.hidden = true;
+tip.setAttribute("aria-hidden", "true");
+document.body.append(tip);
+function showTip(bar) {
+  const [head, value, ghost] = bar.dataset.tip.split("\n");
+  tip.replaceChildren(el("span", "tip-head", head), el("strong", "tip-value", value));
+  if (ghost) tip.append(el("span", "tip-ghost", ghost));
+  tip.hidden = false;
+  const r = bar.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  const x = Math.min(Math.max(8, r.left + r.width / 2 - tw / 2), innerWidth - tw - 8);
+  const top = r.top - th - 8;
+  tip.style.left = x + "px";
+  tip.style.top = (top < 8 ? r.bottom + 8 : top) + "px";
+}
+function hideTip() { tip.hidden = true; }
+document.addEventListener("pointerover", e => { const b = e.target.closest && e.target.closest(".bar"); if (b) showTip(b); });
+document.addEventListener("pointerout", e => { const b = e.target.closest && e.target.closest(".bar"); if (b && !b.contains(e.relatedTarget)) hideTip(); });
+document.addEventListener("focusin", e => { if (e.target.classList && e.target.classList.contains("bar")) showTip(e.target); });
+document.addEventListener("focusout", hideTip);
+addEventListener("scroll", hideTip, true);
 
 // The period before the first week or month of the year comes from the year before.
 function previousYearTail() {
@@ -289,6 +321,7 @@ function renderDashboard(d) {
   $("#tiles").hidden = !has || layout !== "blocks";
   $("#monthWrap").hidden = !has || layout !== "table" || dashMode !== "month";
   $("#weekWrap").hidden = !has || layout !== "table" || dashMode !== "week";
+  $("#ghostKey").hidden = true;
   if (!has) { $("#periodLabel").textContent = String(year); return; }
   if (layout === "table") {
     $("#periodLabel").textContent = (dashMode === "week" ? "Weekly " : "Monthly ") + year;
@@ -297,6 +330,8 @@ function renderDashboard(d) {
   }
 
   const series = dashMode === "week" ? d.weekM : d.monthM;
+  const last = yearData(year - 1);
+  const ghostSeries = dashMode === "week" ? last.weekM : last.monthM;
   let idx = selected[dashMode];
   if (idx === null || !series[idx]) idx = latestIndex(series);
   selected[dashMode] = idx;
@@ -306,6 +341,7 @@ function renderDashboard(d) {
     unit = "week";
     let lastMonth = -1;
     labels = {
+      ghost: "Same week " + (year - 1),
       full: d.weekKeys.map(k => weekName(keyTime(k)) + ", " + shortDate(keyTime(k))),
       short: d.weekKeys.map(k => {
         const m = monthOfWeek(keyTime(k));
@@ -317,14 +353,16 @@ function renderDashboard(d) {
     period = "Week of " + shortDate(keyTime(d.weekKeys[idx])) + " " + year;
   } else {
     unit = "month";
-    labels = { full: MONTHS_LONG.map(m => m + " " + year), short: MONTHS.map(m => m.charAt(0)) };
+    labels = { ghost: "Same month " + (year - 1), full: MONTHS_LONG.map(m => m + " " + year), short: MONTHS.map(m => m.charAt(0)) };
     period = MONTHS_LONG[idx] + " " + year;
   }
   $("#periodLabel").textContent = period;
+  $("#ghostKey").hidden = !ghostSeries.some(Boolean);
+  $("#ghostKey").textContent = "Dotted bars show " + (year - 1);
 
   const m = series[idx];
   const prev = idx > 0 ? series[idx - 1] : previousYearTail();
-  const pick = i => { selected[dashMode] = i; renderDashboard(d); };
+  const pick = i => { selected[dashMode] = i; hideTip(); renderDashboard(d); };
 
   const tiles = $("#tiles");
   tiles.replaceChildren();
@@ -336,7 +374,7 @@ function renderDashboard(d) {
     body.append(el("p", "tile-value", fmt(m[t.k], lane.fmt)));
     const ch = prev ? change(m[t.k], prev[t.k], lane.fmt, unit) : "";
     body.append(el("p", "tile-change", ch || " "));
-    body.append(barChart(series, t.k, labels, idx, pick));
+    body.append(barChart(series, t.k, labels, idx, pick, ghostSeries));
     tile.append(body);
     tiles.append(tile);
   });
