@@ -730,7 +730,7 @@ function exampleState() {
 /* ---------- Google Drive (works like draw.io) ---------- */
 
 // Paste the OAuth client ID from Google Cloud here. While it's empty, Drive saving stays switched off.
-const DRIVE_CLIENT_ID = "";
+const DRIVE_CLIENT_ID = "889111204943-edo28tmkq0e2224mg86prldvujm907cd.apps.googleusercontent.com";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const DRIVE_LAST_KEY = "ca-offer-dashboard-drive";
 const API = "https://www.googleapis.com/drive/v3/files";
