@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Track the six numbers that tell you whether your offer is working. Runs entirely in your browser.">
+  <title>Offer Optimization Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cabin+Condensed:wght@700&family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <main>
+    <section id="viewDashboard" class="view" role="tabpanel" aria-labelledby="tab-dashboard">
+      <div class="page-head">
+        <h2 class="page-title">Dashboard</h2>
+        <div class="controls">
+          <div class="segmented" role="group" aria-label="Layout">
+            <button type="button" id="layoutBlocks" aria-pressed="true">Blocks</button>
+            <button type="button" id="layoutTable" aria-pressed="false">Table</button>
+          </div>
+          <div class="segmented" role="group" aria-label="Show weeks or months">
+            <button type="button" id="modeWeek" aria-pressed="true">Weekly</button>
+            <button type="button" id="modeMonth" aria-pressed="false">Monthly</button>
+          </div>
+          <label><span class="visually-label">Year</span><select class="year-select" id="yearSelect"></select></label>
+        </div>
+      </div>
+      <p class="period" id="periodLabel"></p>
+      <div class="tiles" id="tiles"></div>
+      <div class="scroll" id="monthWrap" hidden><table class="lanes" id="monthTable"></table></div>
+      <div class="scroll" id="weekWrap" hidden><table class="lanes weeks" id="weekTable"></table></div>
+      <div class="empty-state" id="emptyDash" hidden>No data. Add data in Data Input.</div>
+    </section>
+
+    <section id="viewInputs" class="view" role="tabpanel" aria-labelledby="tab-inputs" hidden>
+      <div class="page-head">
+        <h2 class="page-title">Data Input</h2>
+        <div class="head-actions">
+          <button class="secondary-button head-button" id="openDrive" type="button"><svg class="icon" viewBox="0 0 87.3 78" aria-hidden="true" focusable="false"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg><span>Save to Google Drive</span></button>
+          <button class="primary-button head-button" id="openPaste" type="button">Paste From AI</button>
+        </div>
+      </div>
+      <div class="sheet" id="sheet"><table class="inputs" id="inputTable"></table></div>
+    </section>
+  </main>
+
+  <nav class="sheet-tabs" aria-label="Sheets">
+    <div class="tab-list" role="tablist">
+      <button type="button" role="tab" id="tab-dashboard" data-view="dashboard" aria-controls="viewDashboard">Dashboard</button>
+      <button type="button" role="tab" id="tab-inputs" data-view="inputs" aria-controls="viewInputs">Data Input</button>
+    </div>
+    <div class="bar-right">
+      <button class="text-link drive-status" id="driveStatus" type="button" hidden></button>
+      <p class="brand"><span class="brand-title">Offer Optimization Dashboard</span><span class="brand-sep" aria-hidden="true">|</span><a class="text-logo" href="https://conversionalchemy.com" target="_blank" rel="noopener">ConversionAlchemy.com</a></p>
+    </div>
+  </nav>
+
+  <dialog id="pasteDialog" aria-label="Paste from AI">
+    <textarea id="pasteInput" rows="14" aria-label="Weekly numbers" spellcheck="false"></textarea>
+    <p class="paste-error" id="pasteError" hidden></p>
+    <div class="dialog-actions">
+      <button class="secondary-button" id="copyPrompt" type="button">Copy Instructions For AI</button>
+      <button class="text-link load-example" type="button">Load Example Data</button>
+      <button class="text-link" id="resetAll" type="button">Clear All Data</button>
+      <span class="dialog-spacer"></span>
+      <button class="secondary-button" id="closePaste" type="button">Cancel</button>
+      <button class="primary-button" id="applyPaste" type="button">Fill Weeks</button>
+    </div>
+  </dialog>
+
+  <dialog id="driveDialog" aria-labelledby="driveTitle">
+    <h3 class="dialog-title" id="driveTitle">Google Drive</h3>
+    <p class="drive-note" id="driveSetup" hidden>Google Drive saving switches on once this tool is live on its own website and connected to Google.</p>
+    <div id="driveSignedOut" hidden>
+      <button class="primary-button" id="driveConnect" type="button">Connect Google Drive</button>
+    </div>
+    <div class="drive-in" id="driveSignedIn" hidden>
+      <div class="drive-save">
+        <label class="drive-name"><span>File name</span><input id="driveName" type="text" maxlength="80"></label>
+        <button class="primary-button" id="driveSave" type="button">Save</button>
+      </div>
+      <p class="drive-list-title">Your dashboards</p>
+      <ul class="drive-list" id="driveList"></ul>
+    </div>
+    <p class="paste-error" id="driveError" hidden></p>
+    <div class="dialog-actions">
+      <button class="text-link" id="driveDisconnect" type="button" hidden>Disconnect</button>
+      <span class="dialog-spacer"></span>
+      <button class="secondary-button" id="closeDrive" type="button">Close</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
