@@ -31,8 +31,12 @@ Until Google approves it, people see a "Google hasn't verified this app" warning
 
 ## How it works for students
 
-- **Data Input > Google Drive > Connect Google Drive**, name the file, then Save. It appears in their Drive as `Name.json`.
-- After that, every change saves automatically. The bottom bar shows "Saved to Drive".
+On Data Input, the **Google Drive** menu works like draw.io's File menu:
+
+- **Save to Google Drive** (Cmd+S / Ctrl+S): the first time, they name the file and it lands in their Drive as `Name.json`. After that, every change saves automatically and the bottom bar shows "Saved to Drive".
+- **Save As**: saves a copy under a new name, for example one file per store.
+- **Open**: lists every dashboard they've saved, newest first, with a search box. It works on any computer they sign in on.
+- **Open Recent**: the last files they opened or saved in this browser, one click to reopen.
+- **New Dashboard**: a blank sheet, ready to save as a new file.
+- If they're about to replace numbers that aren't saved anywhere, it asks first.
 - When they come back, the bottom bar shows "Drive • Name • Reconnect". One click signs them in and opens their latest copy.
-- If they edited while signed out, Reconnect saves those newer numbers to Drive instead of overwriting them.
-- The Google Drive window lists every dashboard they've saved, newest first, so they can keep one per store and switch between them.

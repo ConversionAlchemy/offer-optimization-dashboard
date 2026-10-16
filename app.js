@@ -750,13 +750,16 @@ function loadGoogle() {
   sc.id = "gis";
   sc.src = "https://accounts.google.com/gsi/client";
   sc.async = true;
+  sc.onerror = () => { drive.unavailable = true; };
   document.head.append(sc);
 }
 
 // Must run straight from a click, or the browser blocks Google's sign-in window.
 function connectDrive(then) {
   if (!(window.google && google.accounts && google.accounts.oauth2)) {
-    return showDriveError("Google is still loading. Give it a second and try again.");
+    return showDriveError(drive.unavailable
+      ? "Google Drive can't load here. Open the live dashboard to use it."
+      : "Google is still loading. Give it a second and try again.");
   }
   if (!drive.client) {
     drive.client = google.accounts.oauth2.initTokenClient({ client_id: DRIVE_CLIENT_ID, scope: DRIVE_SCOPE, callback: () => {} });
@@ -777,6 +780,7 @@ async function api(url, opts = {}) {
     headers: Object.assign({ Authorization: "Bearer " + drive.token }, opts.headers || {})
   }));
   if (res.status === 401) { drive.token = null; throw Object.assign(new Error("expired"), { expired: true }); }
+  if (res.status === 404) throw Object.assign(new Error("That file isn't in your Google Drive any more."), { missing: true });
   if (!res.ok) throw new Error("Google Drive couldn't do that (error " + res.status + "). Try again in a moment.");
   return res;
 }
@@ -824,7 +828,15 @@ async function readFile(id) {
 function remember(file, pending) {
   drive.file = { id: file.id, name: cleanName(file.name) };
   setDriveLast({ id: drive.file.id, name: drive.file.name, pending: !!pending });
+  addRecent(drive.file);
 }
+
+/* Open Recent: the last files opened or saved in this browser */
+const RECENT_KEY = "ca-offer-dashboard-recent";
+function recents() { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } }
+function setRecents(list) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 8))); } catch {} }
+function addRecent(f) { setRecents([{ id: f.id, name: f.name, at: Date.now() }].concat(recents().filter(r => r.id !== f.id))); }
+function dropRecent(id) { setRecents(recents().filter(r => r.id !== id)); }
 
 /* status in the bottom bar */
 function driveStatus(text) {
@@ -868,9 +880,9 @@ $("#driveStatus").addEventListener("click", () => {
   const last = driveLast();
   if (driveConnected()) {
     if (drive.file && /failed|Not saved/.test($("#driveStatus").textContent)) return driveAutosave();
-    return openDriveDialog();
+    return openOpenDialog();
   }
-  if (!last) return openDriveDialog();
+  if (!last) return openOpenDialog();
   connectDrive(async () => {
     driveStatus("Opening…");
     try {
@@ -900,94 +912,266 @@ function loadDriveData(data) {
   render();
 }
 
-/* the Google Drive window */
-const driveDialog = $("#driveDialog");
-function showDriveError(msg) { const e = $("#driveError"); e.textContent = msg; e.hidden = !msg; }
+/* ---------- the Google Drive menu, like draw.io's File menu ---------- */
 
-async function openDriveDialog() {
-  showDriveError("");
-  const configured = !!DRIVE_CLIENT_ID;
-  const on = configured && driveConnected();
-  $("#driveSetup").hidden = configured;
-  $("#driveSignedOut").hidden = !configured || on;
-  $("#driveSignedIn").hidden = !on;
-  $("#driveDisconnect").hidden = !configured || !(on || driveLast());
-  if (!driveDialog.open) { driveDialog.showModal(); document.body.classList.add("dialog-open"); }
-  if (on) {
-    $("#driveName").value = drive.file ? drive.file.name : (driveLast() ? driveLast().name : "Offer Dashboard");
-    await refreshList();
-  }
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const menuBtn = $("#driveMenuBtn");
+const menu = $("#driveMenu");
+$("#mSaveKey").textContent = isMac ? "⌘S" : "Ctrl+S";
+
+function showDriveError(msg) {
+  const open = [...document.querySelectorAll("dialog")].find(d => d.open && d.querySelector(".drive-error"));
+  if (open) {
+    const e = open.querySelector(".drive-error");
+    e.textContent = msg;
+    e.hidden = !msg;
+  } else if (msg) notify(msg);
 }
 
-async function refreshList() {
-  const list = $("#driveList");
-  list.replaceChildren(el("li", "empty", "Loading…"));
-  try {
-    const files = await listFiles();
-    list.replaceChildren();
-    if (!files.length) list.append(el("li", "empty", "Nothing saved yet."));
-    files.forEach(f => {
-      const li = el("li", drive.file && drive.file.id === f.id ? "current" : "");
-      const info = el("div", "", cleanName(f.name));
-      info.append(el("small", "", "Edited " + new Date(f.modifiedTime).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })));
-      const open = el("button", "secondary-button", drive.file && drive.file.id === f.id ? "Open Again" : "Open");
-      open.type = "button";
-      let armed = false;
-      open.addEventListener("click", async () => {
-        const unsaved = !state.example && Object.keys(state.weeks).length && (!drive.file || (driveLast() || {}).pending);
-        if (unsaved && !armed) { armed = true; open.textContent = "Replace My Numbers?"; return; }
-        try {
-          loadDriveData(await readFile(f.id));
-          remember(f, false);
-          idleStatus();
-          driveDialog.close();
-          notify("Opened " + cleanName(f.name) + ".");
-        } catch (err) { showDriveError(err.expired ? "Google sign-in expired. Close this and reconnect." : err.message); }
-      });
-      li.append(info, open);
-      list.append(li);
-    });
-  } catch (err) {
-    list.replaceChildren();
-    showDriveError(err.expired ? "Google sign-in expired. Close this and reconnect." : err.message);
-  }
+function withDrive(action) {
+  if (driveConnected()) return action();
+  connectDrive(action);
 }
 
-$("#openDrive").addEventListener("click", openDriveDialog);
-$("#closeDrive").addEventListener("click", () => driveDialog.close());
-driveDialog.addEventListener("close", () => document.body.classList.remove("dialog-open"));
-$("#driveConnect").addEventListener("click", () => connectDrive(() => openDriveDialog()));
+function hasUnsaved() {
+  if (state.example || !Object.keys(state.weeks).length) return false;
+  const last = driveLast();
+  return !last || !!last.pending;
+}
 
-$("#driveSave").addEventListener("click", async () => {
-  const name = $("#driveName").value.trim() || "Offer Dashboard";
-  const btn = $("#driveSave");
-  btn.disabled = true;
-  btn.textContent = "Saving…";
-  showDriveError("");
-  try {
-    const f = drive.file
-      ? await updateFile(drive.file.id, name !== drive.file.name ? name : null)
-      : await createFile(name);
-    remember(f, false);
-    idleStatus();
-    await refreshList();
-    notify("Saved to Drive. Changes now save automatically.");
-  } catch (err) {
-    showDriveError(err.expired ? "Google sign-in expired. Close this and reconnect." : err.message);
-  }
-  btn.disabled = false;
-  btn.textContent = "Save";
+// Ask before replacing numbers that aren't saved anywhere. The go button is a real click, so Google sign-in can open from it.
+const confirmDialog = $("#confirmDialog");
+let confirmAction = null;
+function guardUnsaved(action, goLabel) {
+  if (!hasUnsaved()) return action();
+  confirmAction = action;
+  $("#confirmGo").textContent = goLabel;
+  openModal(confirmDialog);
+}
+$("#confirmGo").addEventListener("click", () => {
+  const act = confirmAction;
+  confirmAction = null;
+  confirmDialog.close();
+  if (act) act();
+});
+$("#confirmCancel").addEventListener("click", () => confirmDialog.close());
+
+function openModal(d) {
+  if (!d.open) d.showModal();
+  document.body.classList.add("dialog-open");
+}
+document.querySelectorAll("dialog").forEach(d => {
+  d.addEventListener("close", () => {
+    if (![...document.querySelectorAll("dialog")].some(x => x.open)) document.body.classList.remove("dialog-open");
+  });
+  d.addEventListener("click", e => {
+    const b = d.getBoundingClientRect();
+    if (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom) d.close();
+  });
 });
 
-$("#driveDisconnect").addEventListener("click", () => {
+/* menu open and close */
+function closeMenu() { menu.hidden = true; menuBtn.setAttribute("aria-expanded", "false"); }
+function openMenu() {
+  buildRecentMenu();
+  $("#mDisconnect").hidden = !(driveConnected() || driveLast());
+  $("#mSave").querySelector(".label").textContent = drive.file ? "Save" : "Save to Google Drive…";
+  menu.hidden = false;
+  menuBtn.setAttribute("aria-expanded", "true");
+  const first = menu.querySelector("button:not([disabled])");
+  if (first) first.focus({ preventScroll: true });
+}
+menuBtn.addEventListener("click", () => (menu.hidden ? openMenu() : closeMenu()));
+document.addEventListener("click", e => { if (!menu.hidden && !e.target.closest(".menu-wrap")) closeMenu(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !menu.hidden) { closeMenu(); menuBtn.focus(); }
+  if (!menu.hidden && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    const items = [...menu.querySelectorAll("button:not([disabled])")].filter(b => b.offsetParent);
+    const i = items.indexOf(document.activeElement);
+    const next = items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length];
+    if (next) { e.preventDefault(); next.focus(); }
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveNow(); }
+});
+// Each menu item closes the menu first, then runs.
+function item(id, fn) { $(id).addEventListener("click", () => { closeMenu(); fn(); }); }
+
+/* Open Recent submenu */
+function buildRecentMenu() {
+  const box = $("#recentMenu");
+  box.replaceChildren();
+  const list = recents();
+  if (!list.length) {
+    const none = el("button", "menu-item", "No recent files");
+    none.type = "button";
+    none.disabled = true;
+    box.append(none);
+    return;
+  }
+  list.forEach(r => {
+    const b = el("button", "menu-item recent-item" + (drive.file && drive.file.id === r.id ? " current" : ""));
+    b.type = "button";
+    b.setAttribute("role", "menuitem");
+    b.append(el("span", "label", r.name), el("small", "", new Date(r.at).toLocaleDateString(undefined, { day: "numeric", month: "short" })));
+    b.addEventListener("click", () => { closeMenu(); openFile(r.id, r.name); });
+    box.append(b);
+  });
+  box.append(el("div", "sep"));
+  const clear = el("button", "menu-item", "Clear Recent");
+  clear.type = "button";
+  clear.addEventListener("click", () => { setRecents([]); buildRecentMenu(); });
+  box.append(clear);
+}
+$("#mRecent").addEventListener("click", e => {
+  e.stopPropagation();
+  const wrap = $("#mRecentWrap");
+  wrap.classList.toggle("open");
+  const first = $("#recentMenu button:not([disabled])");
+  if (wrap.classList.contains("open") && first) first.focus();
+});
+
+/* open a file by id */
+function openFile(id, name) {
+  if (drive.file && drive.file.id === id && driveConnected() && !(driveLast() || {}).pending) {
+    return notify(name + " is already open.");
+  }
+  guardUnsaved(() => withDrive(async () => {
+    driveStatus("Opening…");
+    try {
+      const data = await readFile(id);
+      loadDriveData(data);
+      remember({ id, name }, false);
+      idleStatus();
+      if ($("#openDialog").open) $("#openDialog").close();
+      notify("Opened " + name + ".");
+    } catch (err) {
+      if (err.missing) dropRecent(id);
+      idleStatus();
+      showDriveError(err.expired ? "Google sign-in expired. Try again." : err.message);
+    }
+  }), "Open " + name);
+}
+
+/* Save, and Save As */
+const saveDialog = $("#saveDialog");
+function saveNow() {
+  if (!DRIVE_CLIENT_ID) return;
+  if (!drive.file) return openSaveAs();
+  withDrive(async () => {
+    driveStatus("Saving…");
+    try {
+      const f = await updateFile(drive.file.id);
+      remember(f, false);
+      idleStatus();
+      notify("Saved to Google Drive.");
+    } catch (err) {
+      idleStatus();
+      showDriveError(err.expired ? "Google sign-in expired. Try again." : err.message);
+    }
+  });
+}
+function openSaveAs() {
+  $("#saveError").hidden = true;
+  $("#saveName").value = drive.file ? drive.file.name + " copy" : "Offer Dashboard";
+  openModal(saveDialog);
+  $("#saveName").select();
+}
+function doSaveAs() {
+  const name = $("#saveName").value.trim() || "Offer Dashboard";
+  withDrive(async () => {
+    const btn = $("#saveGo");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const f = await createFile(name);
+      remember(f, false);
+      idleStatus();
+      saveDialog.close();
+      notify("Saved " + name + " to Google Drive. Changes now save automatically.");
+    } catch (err) {
+      showDriveError(err.expired ? "Google sign-in expired. Try again." : err.message);
+    }
+    btn.disabled = false;
+    btn.textContent = "Save";
+  });
+}
+$("#saveGo").addEventListener("click", doSaveAs);
+$("#saveName").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); doSaveAs(); } });
+$("#saveCancel").addEventListener("click", () => saveDialog.close());
+
+/* Open: every dashboard in their Drive, newest first */
+const openDialog = $("#openDialog");
+let openFiles = [];
+function drawOpenList() {
+  const list = $("#openList");
+  const q = $("#openSearch").value.trim().toLowerCase();
+  const rows = openFiles.filter(f => cleanName(f.name).toLowerCase().includes(q));
+  list.replaceChildren();
+  if (!rows.length) {
+    list.append(el("li", "empty", openFiles.length ? "No dashboards match that." : "No dashboards saved yet. Use Save to Google Drive first."));
+    return;
+  }
+  rows.forEach(f => {
+    const li = el("li");
+    const b = el("button", "file-row" + (drive.file && drive.file.id === f.id ? " current" : ""));
+    b.type = "button";
+    const name = cleanName(f.name);
+    const when = "Edited " + new Date(f.modifiedTime).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    b.append(el("span", "label", name), el("small", "", drive.file && drive.file.id === f.id ? "Open now • " + when : when));
+    b.addEventListener("click", () => openFile(f.id, name));
+    li.append(b);
+    list.append(li);
+  });
+}
+function openOpenDialog() {
+  withDrive(async () => {
+    $("#openError").hidden = true;
+    $("#openSearch").value = "";
+    $("#openList").replaceChildren(el("li", "empty", "Loading your dashboards…"));
+    openModal(openDialog);
+    try {
+      openFiles = await listFiles();
+      drawOpenList();
+      $("#openSearch").focus();
+    } catch (err) {
+      $("#openList").replaceChildren();
+      showDriveError(err.expired ? "Google sign-in expired. Close this and try again." : err.message);
+    }
+  });
+}
+$("#openSearch").addEventListener("input", drawOpenList);
+$("#openCancel").addEventListener("click", () => openDialog.close());
+
+/* New Dashboard: a blank sheet, not linked to any file yet */
+function newDashboard() {
+  guardUnsaved(() => {
+    drive.file = null;
+    setDriveLast(null);
+    state = blankState();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {}
+    year = yearOfWeek(todayUTC());
+    selected.week = selected.month = null;
+    idleStatus();
+    render();
+    notify("New blank dashboard. Save it to Google Drive when you're ready.");
+  }, "Start New Dashboard");
+}
+
+/* Disconnect */
+function disconnectDrive() {
   try { if (drive.token && window.google) google.accounts.oauth2.revoke(drive.token, () => {}); } catch {}
   drive.token = null;
   drive.file = null;
   setDriveLast(null);
   idleStatus();
-  driveDialog.close();
   notify("Disconnected from Google Drive. Your numbers are still here.");
-});
+}
+
+item("#mSave", saveNow);
+item("#mSaveAs", openSaveAs);
+item("#mOpen", openOpenDialog);
+item("#mNew", newDashboard);
+item("#mDisconnect", disconnectDrive);
 
 loadGoogle();
 idleStatus();

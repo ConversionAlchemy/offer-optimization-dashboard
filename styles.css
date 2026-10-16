@@ -177,23 +177,45 @@ dialog textarea { width: 100%; min-height: 280px; margin-bottom: 16px; padding: 
 dialog .text-link { padding: 12px 4px; }
 .dialog-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .dialog-spacer { flex: 1 1 auto; }
-#driveDialog { width: min(560px, calc(100vw - 32px)); }
+#saveDialog, #openDialog, #confirmDialog { width: min(560px, calc(100vw - 32px)); }
 .dialog-title { margin: 0 0 16px; font-family: var(--display); font-size: 28px; line-height: 1.1; }
-.drive-note { margin-bottom: 16px; }
-#driveSignedOut { margin-bottom: 16px; }
-.drive-in { display: grid; gap: 16px; margin-bottom: 16px; }
-.drive-save { display: flex; align-items: end; gap: 10px; }
-.drive-name { display: grid; flex: 1 1 auto; gap: 6px; font-weight: 700; }
-.drive-name input { height: 44px; padding: 0 12px; border: 1px solid var(--black); background: var(--white); font-weight: 400; }
-.drive-save .primary-button { height: 44px; padding: 0 24px; }
-.drive-list-title { font-weight: 700; }
-.drive-list { display: grid; max-height: 260px; margin: 0; padding: 0; overflow-y: auto; border: 1px solid var(--black); list-style: none; }
-.drive-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--black); }
+.drive-name { display: grid; gap: 6px; margin-bottom: 16px; font-weight: 700; }
+.drive-name input, .search { height: 44px; padding: 0 12px; border: 1px solid var(--black); background: var(--white); font-weight: 400; }
+.search { width: 100%; margin-bottom: 12px; }
+.drive-list { max-height: 320px; margin: 0 0 16px; padding: 0; overflow-y: auto; border: 1px solid var(--black); list-style: none; }
+.drive-list li { border-bottom: 1px solid var(--black); }
 .drive-list li:last-child { border-bottom: 0; }
-.drive-list li:hover { background: #f2f2f2; }
-.drive-list li.current { font-weight: 700; }
-.drive-list small { display: block; font-weight: 400; font-size: 12px; }
-.drive-list .empty { justify-content: center; }
+.drive-list .empty { padding: 16px 12px; text-align: center; }
+.file-row { display: grid; width: 100%; gap: 1px; padding: 10px 12px; border: 0; background: var(--white); text-align: left; }
+.file-row:hover, .file-row:focus-visible { background: #f2f2f2; }
+.file-row:hover .label { text-decoration: underline; }
+.file-row.current .label { font-weight: 700; }
+.file-row small, .recent-item small { font-size: 12px; }
+.confirm-text { margin-bottom: 20px; font-size: 17px; }
+.danger-button { background: #8b0000; border-color: #8b0000; }
+
+/* the dropdown menu */
+.menu-wrap { position: relative; }
+.caret { font-size: 11px; }
+.menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 20; display: grid; min-width: 250px; padding: 4px 0; border: 1px solid var(--black); background: var(--white); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2); }
+.menu-item { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; padding: 9px 16px; border: 0; background: var(--white); text-align: left; white-space: nowrap; }
+.menu-item:hover, .menu-item:focus-visible { background: #f2f2f2; outline: none; }
+.menu-item:hover .label { text-decoration: underline; }
+.menu-item:disabled { color: #8a8a8a; cursor: default; background: var(--white); }
+.menu-item:disabled .label { text-decoration: none; }
+.menu-item kbd { font-family: var(--body); font-size: 13px; }
+.sep { height: 1px; margin: 4px 0; background: var(--black); opacity: 0.2; }
+.has-sub { position: relative; }
+.submenu { position: absolute; top: -5px; right: calc(100% + 1px); display: none; min-width: 240px; padding: 4px 0; border: 1px solid var(--black); background: var(--white); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2); }
+.has-sub:hover > .submenu, .has-sub:focus-within > .submenu, .has-sub.open > .submenu { display: grid; }
+.has-sub:hover > .menu-item, .has-sub.open > .menu-item { background: #f2f2f2; }
+.recent-item.current .label { font-weight: 700; }
+@media (max-width: 640px) {
+  .menu-wrap { flex: 1 1 0; }
+  .menu-wrap .head-button { width: 100%; }
+  .menu { left: 0; right: auto; }
+  .submenu { position: static; box-shadow: none; border: 0; border-top: 1px solid rgba(0, 0, 0, 0.2); padding-left: 12px; }
+}
 
 .toast { position: fixed; left: 50%; bottom: calc(var(--bar-h) + 16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 10px 16px; background: var(--black); color: var(--white); font-size: 14px; font-weight: 700; z-index: 20; }
 
@@ -216,5 +238,5 @@ dialog .text-link { padding: 12px 4px; }
 
 /* hover underline on every link and button, like the calculator */
 .icon { width: 18px; height: 16px; flex: 0 0 auto; }
-.tab-list button:hover, .segmented button:hover, .drive-status:hover, .drive-list button:hover { text-decoration: underline; }
+.tab-list button:hover, .segmented button:hover, .drive-status:hover { text-decoration: underline; }
 .danger { color: #8b0000; }
