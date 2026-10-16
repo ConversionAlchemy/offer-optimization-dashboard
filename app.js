@@ -193,14 +193,26 @@ function fmt(v, type) {
   return neg ? "(" + out + ")" : out;
 }
 
-// Every change is shown the same way: as a % of last period's number.
-function change(cur, prev, type, unit) {
-  if (!Number.isFinite(cur) || !Number.isFinite(prev)) return "";
-  const tail = " vs " + unit;
-  if (!prev) return "";
+// Every change is shown the same way: as a % of last period's number, with a coloured triangle.
+// Green means better and red means worse, so a falling CAC or break-even ROAS shows green.
+// Moves under 2% count as about the same, so they get no triangle.
+const LOWER_IS_BETTER = new Set(["cac", "beroas"]);
+function change(cur, prev, key, unit) {
+  if (!Number.isFinite(cur) || !Number.isFinite(prev) || !prev) return null;
   const rel = (cur - prev) / Math.abs(prev);
-  if (Math.abs(rel) < 0.005) return "No change" + tail;
-  return (rel > 0 ? "▲ " : "▼ ") + Math.round(Math.abs(rel) * 100) + "%" + tail;
+  const p = Math.round(Math.abs(rel) * 100);
+  const tail = " vs " + unit;
+  if (Math.abs(rel) < 0.02) return { text: (p ? p + "%" : "No change") + tail, dir: 0 };
+  const up = rel > 0;
+  const good = LOWER_IS_BETTER.has(key) ? !up : up;
+  return { text: p + "%" + tail, dir: up ? 1 : -1, good };
+}
+function changeNode(c) {
+  const p = el("p", "tile-change");
+  if (!c) { p.textContent = "\u00a0"; return p; }
+  if (c.dir) p.append(el("span", "tri " + (c.good ? "good" : "bad"), c.dir > 0 ? "\u25B2" : "\u25BC"));
+  p.append(document.createTextNode(c.text));
+  return p;
 }
 
 /* ---------- DOM helpers ---------- */
@@ -388,8 +400,7 @@ function renderDashboard(d) {
     tile.append(el("h2", "tile-head", lane.label));
     const body = el("div", "tile-body");
     body.append(el("p", "tile-value", fmt(m[t.k], lane.fmt)));
-    const ch = prev ? change(m[t.k], prev[t.k], lane.fmt, compareTo) : "";
-    body.append(el("p", "tile-change", ch || " "));
+    body.append(changeNode(prev ? change(m[t.k], prev[t.k], t.k, compareTo) : null));
     body.append(barChart(series, t.k, labels, idx, pick, ghostSeries));
     tile.append(body);
     tiles.append(tile);

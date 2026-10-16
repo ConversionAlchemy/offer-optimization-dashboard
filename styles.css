@@ -93,6 +93,9 @@ body.on-dash main { display: flex; flex-direction: column; gap: 0; height: calc(
 .tile-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-height: 0; padding: 12px 14px 10px; text-align: center; font-variant-numeric: tabular-nums; }
 .tile-value { font-size: clamp(30px, 5.2vh, 56px); font-weight: 700; line-height: 1.1; }
 .tile-change { font-size: 15px; }
+.tile-change .tri { margin-right: 6px; font-size: 17px; vertical-align: -1px; }
+.tile-change .tri.good { color: #1a7f37; }
+.tile-change .tri.bad { color: #c62828; }
 
 /* bar chart */
 .chart { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; gap: 4px; min-height: 56px; margin-top: 8px; }
