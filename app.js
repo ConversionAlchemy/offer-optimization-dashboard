@@ -732,24 +732,25 @@ function exampleState() {
     const bf = t === Date.UTC(2025, 10, 24) || t === Date.UTC(2025, 11, 1); // Black Friday and Cyber week
     const xmasLull = t === Date.UTC(2025, 11, 22) || t === Date.UTC(2025, 11, 29);
     const lift = bf ? 1.55 : xmasLull ? 0.8 : 1;
-    const sessions = Math.round((13800 + i * 120 + (rand() - 0.5) * 1400) * lift);
-    const cvr = (newOffer ? 0.0236 : 0.0197) * (bf ? 1.35 : 1) + (rand() - 0.5) * 0.0022;
+    // an eight-figure store: around $12M a year, $200k-plus a week
+    const sessions = Math.round((112000 + i * 450 + (rand() - 0.5) * 9000) * lift);
+    const cvr = (newOffer ? 0.0281 : 0.0254) * (bf ? 1.3 : 1) + (rand() - 0.5) * 0.0018;
     const orders = Math.round(sessions * cvr);
-    const aov = (newOffer ? 57.6 : bf ? 45.9 : 50.2) + (rand() - 0.5) * 2.4;
+    const aov = (newOffer ? 68.9 : bf ? 56.4 : 62.4) + (rand() - 0.5) * 2.6;
     const netSales = Math.round(orders * aov);
-    const adSpend = Math.round(((newOffer ? 8900 : 6500) + i * 40 + (rand() - 0.5) * 600) * (bf ? 1.6 : xmasLull ? 0.7 : 1));
+    const adSpend = Math.round(((newOffer ? 86000 : 72000) + i * 160 + (rand() - 0.5) * 6000) * (bf ? 1.55 : xmasLull ? 0.7 : 1));
     s.weeks[isoKey(t)] = {
       netSales,
       orders,
-      newCustomers: Math.round(orders * ((bf ? 0.82 : 0.76) + (rand() - 0.5) * 0.06)),
+      newCustomers: Math.round(orders * ((bf ? 0.76 : 0.68) + (rand() - 0.5) * 0.05)),
       sessions,
       adSpend,
-      adRevenue: Math.round(netSales * (0.82 + (rand() - 0.5) * 0.06)),
-      productCosts: Math.round(orders * (newOffer ? 17.6 : 15.2)),
-      shipping: Math.round(orders * 5.1),
+      adRevenue: Math.round(netSales * (0.78 + (rand() - 0.5) * 0.06)),
+      productCosts: Math.round(orders * (newOffer ? 17.9 : 15.8)),
+      shipping: Math.round(orders * 6.9),
       paymentFees: Math.round(netSales * 0.029 + orders * 0.3),
-      otherCosts: Math.round(orders * 1.0),
-      repeatRate: newOffer ? 0.42 : 0.36
+      otherCosts: Math.round(orders * 1.6),
+      repeatRate: newOffer ? 0.40 : 0.34
     };
   }
   return s;
