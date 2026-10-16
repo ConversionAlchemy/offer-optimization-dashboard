@@ -44,6 +44,8 @@ main { width: 100%; margin: 0; display: grid; gap: 28px; padding-block: 24px 48p
 body.on-inputs main { max-width: none; padding-block: 20px 0; }
 
 /* ---------- page heads ---------- */
+/* the dashboard sits in from the edges: 10% of the screen on each side */
+#viewDashboard { padding-inline: max(0px, calc(10vw - 16px)); }
 .page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; margin-bottom: 14px; }
 .page-title { margin: 0; font-family: var(--display); font-size: 40px; font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
 .head-actions { display: flex; gap: 10px; }

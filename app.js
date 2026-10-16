@@ -291,6 +291,7 @@ tip.hidden = true;
 tip.setAttribute("aria-hidden", "true");
 document.body.append(tip);
 function showTip(bar) {
+  if (bar.classList.contains("no-data")) return;
   const [head, value, ghost] = bar.dataset.tip.split("\n");
   tip.replaceChildren(el("span", "tip-head", head), el("strong", "tip-value", value));
   if (ghost) tip.append(el("span", "tip-ghost", ghost));
@@ -372,7 +373,7 @@ function renderDashboard(d) {
     period = MONTHS_LONG[idx] + " " + year;
   }
   $("#periodLabel").textContent = period;
-  $("#ghostKey").hidden = !ghostSeries.some(Boolean);
+  $("#ghostKey").hidden = true;
   $("#ghostKey").textContent = "Dotted bars show " + (year - 1);
 
   const m = series[idx];
@@ -872,12 +873,8 @@ function driveStatus(text) {
   b.hidden = false;
   b.textContent = text;
 }
-function idleStatus() {
-  const last = driveLast();
-  if (driveConnected() && drive.file) driveStatus("Saved to Drive • " + drive.file.name);
-  else if (last) driveStatus("Drive • " + last.name + " • Reconnect");
-  else driveStatus("");
-}
+// The bottom bar stays quiet while everything is fine; it only speaks up when a save to Drive didn't go through.
+function idleStatus() { driveStatus(""); }
 
 /* autosave, called from save() */
 function driveAutosave() {
@@ -889,7 +886,6 @@ function driveAutosave() {
     return;
   }
   clearTimeout(drive.timer);
-  driveStatus("Saving…");
   drive.timer = setTimeout(async () => {
     try {
       const f = await updateFile(drive.file.id);
@@ -925,7 +921,7 @@ $("#driveStatus").addEventListener("click", () => {
       idleStatus();
     } catch (err) {
       drive.file = null;
-      driveStatus("Drive • " + last.name + " • Reconnect");
+      idleStatus();
       notify(err.expired ? "Google sign-in expired. Try again." : "Couldn't open that file. It may have been deleted.");
     }
   });
@@ -1085,8 +1081,7 @@ function saveNow() {
   if (!DRIVE_CLIENT_ID) return;
   if (!drive.file) return openSaveAs();
   withDrive(async () => {
-    driveStatus("Saving…");
-    try {
+      try {
       const f = await updateFile(drive.file.id);
       remember(f, false);
       idleStatus();
